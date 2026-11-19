@@ -206,6 +206,126 @@
     </div>
 </div>
 
+<!-- Feature 4: Sales Team Leaderboard & Performance Gamification -->
+<div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center py-2 px-3 bg-white">
+        <div class="d-flex align-items-center gap-2">
+            <span class="fs-6">🏆</span>
+            <div>
+                <span class="fw-bold text-dark small">Sales Team Leaderboard & Performance Gamification</span>
+                <span class="text-muted d-block" style="font-size: 0.7rem;">Scored on Won Deals (100 pts), Site Visits (25 pts), and Calls Logged (5 pts)</span>
+            </div>
+        </div>
+        <span class="badge bg-warning-subtle text-dark border border-warning-subtle py-1 px-2" style="font-size: 0.72rem;">
+            <i class="bi bi-award-fill text-warning me-1"></i> Live Competition
+        </span>
+    </div>
+
+    <div class="table-responsive" style="overflow-x: hidden !important;">
+        <table class="table table-hover align-middle mb-0" style="width: 100%;">
+            <thead class="table-light" style="font-size: 0.75rem;">
+                <tr>
+                    <th style="width: 8%;" class="ps-3 text-center">Rank</th>
+                    <th style="width: 25%;">Executive</th>
+                    <th style="width: 18%;">Gamification Score</th>
+                    <th style="width: 10%;" class="text-center">Calls</th>
+                    <th style="width: 12%;" class="text-center">Site Visits</th>
+                    <th style="width: 12%;" class="text-center">Won Deals</th>
+                    <th style="width: 15%;" class="text-end pe-3">Booked Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($leaderboard as $idx => $member)
+                    @php
+                        $rank = $idx + 1;
+                        $maxPoints = $leaderboard->first()?->points ?: 1;
+                        $scorePct = min(100, round(($member->points / max(1, $maxPoints)) * 100));
+                    @endphp
+                    <tr>
+                        <td class="ps-3 text-center">
+                            @if($rank === 1)
+                                <span class="badge bg-warning text-dark border border-warning fw-bold px-2 py-1" style="font-size: 0.78rem;" title="1st Place - Gold Champion">
+                                    🥇 1st
+                                </span>
+                            @elseif($rank === 2)
+                                <span class="badge bg-secondary-subtle text-dark border border-secondary fw-bold px-2 py-1" style="font-size: 0.78rem;" title="2nd Place - Silver Star">
+                                    🥈 2nd
+                                </span>
+                            @elseif($rank === 3)
+                                <span class="badge bg-danger-subtle text-danger border border-danger fw-bold px-2 py-1" style="font-size: 0.78rem;" title="3rd Place - Bronze Achiever">
+                                    🥉 3rd
+                                </span>
+                            @else
+                                <span class="text-muted fw-semibold" style="font-size: 0.8rem;">#{{ $rank }}</span>
+                            @endif
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="avatar-circle flex-shrink-0" style="width: 30px; height: 30px; font-size: 0.75rem; background-color: #0f172a; color: #fff;">
+                                    {{ strtoupper(substr($member->name, 0, 2)) }}
+                                </div>
+                                <div class="text-truncate">
+                                    <div class="fw-semibold text-dark text-truncate" style="font-size: 0.8125rem;">
+                                        {{ $member->name }}
+                                        @if($member->id === $user->id)
+                                            <span class="badge bg-primary text-white py-0 px-1" style="font-size: 0.65rem;">You</span>
+                                        @endif
+                                    </div>
+                                    <span class="text-muted text-capitalize" style="font-size: 0.7rem;">
+                                        {{ str_replace('_', ' ', $member->role) }} · {{ $member->total_leads }} active leads
+                                    </span>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <span class="fw-bold text-dark" style="font-size: 0.8rem;">
+                                    <i class="bi bi-stars text-warning me-0.5"></i> {{ number_format($member->points) }} pts
+                                </span>
+                                <span class="text-muted small" style="font-size: 0.7rem;">{{ $member->conversion_rate }}% conv.</span>
+                            </div>
+                            <div class="progress" style="height: 5px;">
+                                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ $scorePct }}%;" aria-valuenow="{{ $scorePct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-light text-dark border fw-medium" style="font-size: 0.75rem;">
+                                <i class="bi bi-telephone me-0.5 text-primary"></i> {{ $member->calls_logged }}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-light text-dark border fw-medium" style="font-size: 0.75rem;">
+                                <i class="bi bi-geo-alt me-0.5 text-warning"></i> {{ $member->site_visits }}
+                                <span class="text-success small">({{ $member->completed_visits }} done)</span>
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-success-subtle text-success border border-success fw-bold px-2" style="font-size: 0.75rem;">
+                                {{ $member->won_deals }} Won
+                            </span>
+                        </td>
+                        <td class="text-end pe-3">
+                            <span class="fw-bold text-dark" style="font-size: 0.8125rem;">
+                                @if($member->revenue_booked >= 10000000)
+                                    ₹ {{ number_format($member->revenue_booked / 10000000, 2) }} Cr
+                                @elseif($member->revenue_booked > 0)
+                                    ₹ {{ number_format($member->revenue_booked / 100000, 1) }} L
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </span>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" class="text-center py-3 text-muted small">No sales executive data available yet.</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</div>
+
 <!-- Recent Incoming Leads Stream -->
 <div class="card mb-0">
     <div class="card-header d-flex justify-content-between align-items-center py-2 px-3">

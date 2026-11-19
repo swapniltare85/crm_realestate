@@ -98,7 +98,7 @@
             @endif
 
             <!-- Project Filter -->
-            <div class="{{ isset($isAgent) && $isAgent ? 'col-md-4' : 'col-md-2' }} col-6">
+            <div class="{{ isset($isAgent) && $isAgent ? 'col-md-3' : 'col-md-2' }} col-6">
                 <label class="form-label text-muted fw-semibold mb-1" style="font-size: 0.72rem;">Project</label>
                 <select name="project_id" class="form-select form-select-sm">
                     <option value="">All Projects</option>
@@ -110,12 +110,27 @@
                 </select>
             </div>
 
+            <!-- Feature 5: Smart Tag Filter -->
+            <div class="col-md-2 col-6">
+                <label class="form-label text-muted fw-semibold mb-1" style="font-size: 0.72rem;">Smart Tag</label>
+                <select name="tag" class="form-select form-select-sm">
+                    <option value="">All Tags</option>
+                    @if(isset($allTags))
+                        @foreach($allTags as $tg)
+                            <option value="{{ $tg }}" {{ request('tag') == $tg ? 'selected' : '' }}>
+                                #{{ $tg }}
+                            </option>
+                        @endforeach
+                    @endif
+                </select>
+            </div>
+
             <!-- Buttons -->
             <div class="col-md-1 col-12 d-flex gap-1">
                 <button type="submit" class="btn btn-sm btn-primary w-100" title="Apply Filter">
                     <i class="bi bi-funnel"></i>
                 </button>
-                @if(request()->hasAny(['search', 'status_id', 'source_id', 'assigned_to', 'project_id', 'is_hot', 'due_today']))
+                @if(request()->hasAny(['search', 'status_id', 'source_id', 'assigned_to', 'project_id', 'tag', 'is_hot', 'due_today']))
                     <a href="{{ route('leads.index') }}" class="btn btn-sm btn-outline-secondary" title="Reset">
                         <i class="bi bi-x-lg"></i>
                     </a>
@@ -125,7 +140,7 @@
             <!-- Quick Filter Chips -->
             <div class="col-12 mt-2 pt-2 border-top d-flex align-items-center gap-2 flex-wrap">
                 <span class="text-muted fw-semibold" style="font-size: 0.6875rem; text-transform: uppercase;">Quick Filter:</span>
-                <a href="{{ route('leads.index') }}" class="btn btn-sm {{ !request()->hasAny(['is_hot', 'due_today']) && !request('status_id') ? 'btn-dark' : 'btn-outline-secondary' }} py-0 px-2" style="font-size: 0.72rem;">
+                <a href="{{ route('leads.index') }}" class="btn btn-sm {{ !request()->hasAny(['is_hot', 'due_today', 'tag']) && !request('status_id') ? 'btn-dark' : 'btn-outline-secondary' }} py-0 px-2" style="font-size: 0.72rem;">
                     All ({{ $leads->total() }})
                 </a>
                 <a href="{{ route('leads.index', array_merge(request()->query(), ['is_hot' => 1])) }}" class="btn btn-sm {{ request('is_hot') ? 'btn-danger' : 'btn-outline-danger' }} py-0 px-2" style="font-size: 0.72rem;">
@@ -134,6 +149,14 @@
                 <a href="{{ route('leads.index', array_merge(request()->query(), ['due_today' => 1])) }}" class="btn btn-sm {{ request('due_today') ? 'btn-warning text-dark' : 'btn-outline-warning text-dark' }} py-0 px-2" style="font-size: 0.72rem;">
                     <i class="bi bi-clock"></i> Due Today
                 </a>
+                @if(isset($allTags) && count($allTags) > 0)
+                    <span class="text-muted small ms-2" style="font-size: 0.6875rem;">Tags:</span>
+                    @foreach(array_slice($allTags, 0, 4) as $quickTag)
+                        <a href="{{ route('leads.index', ['tag' => $quickTag]) }}" class="btn btn-sm {{ request('tag') === $quickTag ? 'btn-secondary text-white' : 'btn-outline-secondary' }} py-0 px-2" style="font-size: 0.7rem;">
+                            #{{ $quickTag }}
+                        </a>
+                    @endforeach
+                @endif
             </div>
         </form>
     </div>
@@ -226,6 +249,11 @@
                                 @if($lead->is_hot)
                                     <span class="badge-hot-pro ms-1"><i class="bi bi-fire"></i> Hot</span>
                                 @endif
+                                @if(isset($duplicatePhones) && in_array($lead->phone, $duplicatePhones))
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle py-0 px-1 ms-1" style="font-size: 0.62rem;" title="Cross-Project Buyer: Multiple project inquiries">
+                                        <i class="bi bi-diagram-3"></i> Multi-Project
+                                    </span>
+                                @endif
                             </div>
                             <div class="d-flex align-items-center gap-2 mt-1 small" style="font-size: 0.75rem;">
                                 <span class="text-dark fw-medium">{{ $lead->phone }}</span>
@@ -237,6 +265,24 @@
                                 </a>
                                 @if($lead->city || $lead->preferred_location)
                                     <span class="text-muted text-truncate" style="max-width: 90px;">· {{ $lead->preferred_location ?? $lead->city }}</span>
+                                @endif
+                            </div>
+
+                            <div class="d-flex align-items-center gap-1 mt-1 flex-wrap">
+                                <!-- Feature 7: Intent Score -->
+                                <span class="badge {{ $lead->intent_label['badge'] }} py-0 px-1" style="font-size: 0.62rem;" title="AI Intent Score: {{ $lead->intent_score }}/100 ({{ $lead->intent_label['label'] }})">
+                                    <i class="bi {{ $lead->intent_label['icon'] }} me-0.5"></i> {{ $lead->intent_score }}
+                                </span>
+                                <!-- Feature 5: Smart Tags -->
+                                @if(!empty($lead->tags) && is_array($lead->tags))
+                                    @foreach(array_slice($lead->tags, 0, 2) as $tg)
+                                        <a href="{{ route('leads.index', ['tag' => $tg]) }}" class="badge bg-light text-secondary border text-decoration-none py-0 px-1" style="font-size: 0.62rem;" title="Filter by #{{ $tg }}">
+                                            #{{ $tg }}
+                                        </a>
+                                    @endforeach
+                                    @if(count($lead->tags) > 2)
+                                        <span class="text-muted" style="font-size: 0.62rem;">+{{ count($lead->tags) - 2 }}</span>
+                                    @endif
                                 @endif
                             </div>
                         </td>

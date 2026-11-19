@@ -128,6 +128,14 @@
                             <input type="text" name="preferred_location" class="form-control form-control-sm" placeholder="e.g. Bandra West, Whitefield">
                         </div>
 
+                        <!-- Feature 5: Smart Tags -->
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary mb-1">
+                                <i class="bi bi-tags text-primary me-1"></i> Smart Tags (Comma-separated)
+                            </label>
+                            <input type="text" name="tags" class="form-control form-control-sm" placeholder="e.g. NRI, Investor, Immediate-Possession, High Networth">
+                        </div>
+
                         <!-- Assignment & Pipeline -->
                         <div class="col-12 mt-3">
                             <span class="text-muted fw-bold small text-uppercase d-block border-bottom pb-1" style="font-size: 0.6875rem; letter-spacing: 0.06em;">

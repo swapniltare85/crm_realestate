@@ -67,14 +67,32 @@ class LeadWebController extends Controller
             $query->whereDate('next_follow_up_date', '<=', now()->toDateString());
         }
 
+        if ($request->filled('tag')) {
+            $query->whereJsonContains('tags', $request->tag);
+        }
+
         $leads = $query->latest('id')->paginate(12)->withQueryString();
+
+        // Query phone numbers with multiple project inquiries for Cross-Project badges
+        $duplicatePhones = Lead::select('phone')
+            ->whereNotNull('phone')
+            ->groupBy('phone')
+            ->havingRaw('COUNT(*) > 1')
+            ->pluck('phone')
+            ->toArray();
+
+        // Unique tags across database for filter dropdown
+        $allTags = Lead::whereNotNull('tags')->pluck('tags')->flatten()->unique()->filter()->values()->toArray();
+        if (empty($allTags)) {
+            $allTags = ['NRI', 'Investor', 'Immediate-Possession', 'First-Time Buyer', 'Pre-Approved Loan', 'High Networth'];
+        }
 
         $sources = LeadSource::where('is_active', true)->get();
         $statuses = LeadStatus::where('is_active', true)->orderBy('order')->get();
         $projects = Project::all();
         $agents = User::where('role', 'sales_agent')->where('status', 'active')->get();
 
-        return view('leads.index', compact('leads', 'sources', 'statuses', 'projects', 'agents', 'isAgent', 'user'));
+        return view('leads.index', compact('leads', 'sources', 'statuses', 'projects', 'agents', 'isAgent', 'user', 'duplicatePhones', 'allTags'));
     }
 
     public function store(Request $request)
@@ -163,6 +181,14 @@ class LeadWebController extends Controller
         $validated['is_hot'] = $request->has('is_hot');
         $validated['is_organic'] = $request->has('is_organic');
 
+        if ($request->filled('tags')) {
+            if (is_string($request->tags)) {
+                $validated['tags'] = array_values(array_filter(array_map('trim', explode(',', $request->tags))));
+            } elseif (is_array($request->tags)) {
+                $validated['tags'] = array_values(array_filter($request->tags));
+            }
+        }
+
         $lead = Lead::create($validated);
 
         LeadActivity::create([
@@ -171,6 +197,49 @@ class LeadWebController extends Controller
             'activity_type' => 'created',
             'description' => "Lead created manually. Assigned to " . ($lead->assignedAgent ? $lead->assignedAgent->name : 'Unassigned'),
         ]);
+
+        // Cross-Project Linking: Detect if customer has other project inquiries
+        $cleanPhone = substr(preg_replace('/[^0-9]/', '', (string)$lead->phone), -10);
+        $existingLeads = Lead::where('id', '!=', $lead->id)
+            ->where(function($q) use ($cleanPhone, $lead) {
+                if (!empty($cleanPhone) && strlen($cleanPhone) >= 8) {
+                    $q->where('phone', 'like', "%{$cleanPhone}");
+                }
+                if (!empty($lead->email)) {
+                    $q->orWhere('email', $lead->email);
+                }
+            })
+            ->with('project')
+            ->get();
+
+        if ($existingLeads->isNotEmpty()) {
+            $priorProjects = $existingLeads->map(fn($l) => $l->project?->name ?? $l->enquiry_name)->filter()->unique()->implode(', ');
+            if (empty($priorProjects)) $priorProjects = 'Prior Project';
+
+            LeadActivity::create([
+                'lead_id' => $lead->id,
+                'user_id' => Auth::id() ?? $lead->assigned_to,
+                'activity_type' => 'cross_project_linked',
+                'description' => "Cross-Project Portfolio: Customer previously inquired for {$priorProjects} (Lead #" . $existingLeads->pluck('id')->implode(', #') . "). Profile linked.",
+                'properties' => [
+                    'linked_lead_ids' => $existingLeads->pluck('id')->toArray(),
+                    'prior_projects' => $priorProjects,
+                ],
+            ]);
+
+            foreach ($existingLeads as $prevLead) {
+                LeadActivity::create([
+                    'lead_id' => $prevLead->id,
+                    'user_id' => Auth::id() ?? $prevLead->assigned_to,
+                    'activity_type' => 'cross_project_linked',
+                    'description' => "Cross-Project Opportunity: Customer also inquired for '{$lead->project_name}' (New Lead #{$lead->id}).",
+                    'properties' => [
+                        'new_lead_id' => $lead->id,
+                        'new_project' => $lead->project_name,
+                    ],
+                ]);
+            }
+        }
 
         return redirect()->route('leads.show', $lead->id)
             ->with('success', 'Lead created successfully!');
@@ -282,6 +351,14 @@ class LeadWebController extends Controller
         $validated['is_hot'] = $request->has('is_hot');
         $validated['is_organic'] = $request->has('is_organic');
 
+        if ($request->has('tags')) {
+            if (is_string($request->tags)) {
+                $validated['tags'] = array_values(array_filter(array_map('trim', explode(',', $request->tags))));
+            } elseif (is_array($request->tags)) {
+                $validated['tags'] = array_values(array_filter($request->tags));
+            }
+        }
+
         // RBAC: If user cannot reassign leads (e.g. Sales Agent), prevent modifying assigned_to
         if (!$user->canReassignLead()) {
             unset($validated['assigned_to']);
@@ -317,6 +394,7 @@ class LeadWebController extends Controller
             'is_hot' => 'Hot Priority Flag',
             'is_organic' => 'Organic Lead Flag',
             'next_follow_up_date' => 'Next Follow-up Reminder',
+            'tags' => 'Smart Tags',
             'platform' => 'Ad Platform',
             'sub_source' => 'Sub-Source',
             'campaign_name' => 'Campaign Name',

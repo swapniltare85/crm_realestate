@@ -60,6 +60,11 @@ class User extends Authenticatable
         return $this->hasMany(LeadFollowup::class, 'user_id');
     }
 
+    public function siteVisits()
+    {
+        return $this->hasMany(SiteVisit::class, 'assigned_to');
+    }
+
     /**
      * RBAC Role Helper Methods
      */
@@ -129,10 +134,5 @@ class User extends Authenticatable
     public function canDeleteLead(): bool
     {
         return $this->isAdmin();
-    }
-
-    public function siteVisits()
-    {
-        return $this->hasMany(SiteVisit::class, 'assigned_to');
     }
 }

@@ -69,6 +69,7 @@ class Lead extends Model
         'ads_keyword',
         'keyword_type',
         'ad_strategy',
+        'tags',
     ];
 
     protected $casts = [
@@ -78,7 +79,43 @@ class Lead extends Model
         'next_follow_up_date' => 'datetime',
         'is_hot' => 'boolean',
         'is_organic' => 'boolean',
+        'tags' => 'array',
     ];
+
+    /**
+     * Feature 7: Smart Lead Intent Score (0 to 100)
+     */
+    public function getIntentScoreAttribute(): int
+    {
+        $score = 15;
+
+        if (!empty($this->phone) && !empty($this->email)) $score += 15;
+        if ($this->budget_min > 0 || $this->budget_max > 0) $score += 15;
+        if (!empty($this->configuration) || !empty($this->preferred_location)) $score += 10;
+        if ($this->is_hot) $score += 15;
+        if ($this->followups()->count() > 0) $score += 15;
+
+        $visits = $this->siteVisits();
+        if ($visits->count() > 0) {
+            $score += 15;
+            if ($visits->where('status', 'completed')->exists()) {
+                $score += 15;
+            }
+        }
+
+        return min(100, $score);
+    }
+
+    public function getIntentLabelAttribute(): array
+    {
+        $score = $this->intent_score;
+        if ($score >= 75) {
+            return ['label' => 'High Intent', 'badge' => 'bg-danger text-white', 'icon' => 'bi-fire'];
+        } elseif ($score >= 50) {
+            return ['label' => 'Warm / Engaged', 'badge' => 'bg-warning text-dark', 'icon' => 'bi-lightning-charge-fill'];
+        }
+        return ['label' => 'Nurturing', 'badge' => 'bg-secondary text-white', 'icon' => 'bi-hourglass-split'];
+    }
 
     // Backward compatibility for project_name <-> enquiry_name
     public function setProjectNameAttribute($value)
@@ -138,5 +175,26 @@ class Lead extends Model
     public function activities()
     {
         return $this->hasMany(LeadActivity::class, 'lead_id')->latest('created_at');
+    }
+
+    /**
+     * Cross-Project Portfolio: Find other inquiries by the same buyer across different projects
+     */
+    public function relatedProjectLeads()
+    {
+        $cleanPhone = substr(preg_replace('/[^0-9]/', '', (string)$this->phone), -10);
+
+        return static::with(['project', 'status', 'assignedAgent'])
+            ->where('id', '!=', $this->id)
+            ->where(function($q) use ($cleanPhone) {
+                if (!empty($cleanPhone) && strlen($cleanPhone) >= 8) {
+                    $q->where('phone', 'like', "%{$cleanPhone}");
+                }
+                if (!empty($this->email)) {
+                    $q->orWhere('email', $this->email);
+                }
+            })
+            ->latest('id')
+            ->get();
     }
 }

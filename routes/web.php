@@ -45,6 +45,7 @@ Route::middleware('auth')->group(function () {
     // Projects / Inventory
     Route::get('/projects', [ProjectWebController::class, 'index'])->name('projects.index');
     Route::post('/projects', [ProjectWebController::class, 'store'])->name('projects.store');
+    Route::post('/projects/units/{id}/status', [ProjectWebController::class, 'updateUnitStatus'])->name('projects.units.status');
 
     // Admin Team & Users Management (Only accessible by Admin role)
     Route::prefix('users')->name('users.')->middleware(\App\Http\Middleware\EnsureAdmin::class)->group(function () {

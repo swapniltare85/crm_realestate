@@ -19,6 +19,9 @@
     $auditTrail = $lead->activities->filter(function($act) {
         return $act->activity_type !== 'lead_edited';
     });
+
+    // Cross-Project Portfolio: Find other inquiries by the same buyer across different projects
+    $crossProjectLeads = $lead->relatedProjectLeads();
 @endphp
 
 <!-- Lead Profile Header Card -->
@@ -43,6 +46,23 @@
                             <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 0.7rem;">Organic</span>
                         @else
                             <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.7rem;">Paid Campaign</span>
+                        @endif
+                        @if($crossProjectLeads->isNotEmpty())
+                            <span class="badge bg-purple-subtle text-purple border fw-semibold" style="background-color: #f3e8ff; border-color: #d8b4fe !important; font-size: 0.7rem; color: #7e22ce;">
+                                <i class="bi bi-diagram-3 me-1"></i> Multi-Project ({{ $crossProjectLeads->count() + 1 }} Inquiries)
+                            </span>
+                        @endif
+
+                        <!-- Feature 7: Intent Score Badge -->
+                        <span class="badge {{ $lead->intent_label['badge'] }} border py-1 px-2" style="font-size: 0.72rem;" title="AI Purchase Intent Score: {{ $lead->intent_score }}/100">
+                            <i class="bi {{ $lead->intent_label['icon'] }} me-1"></i> Intent: {{ $lead->intent_score }}/100 ({{ $lead->intent_label['label'] }})
+                        </span>
+
+                        <!-- Feature 5: Smart Tags -->
+                        @if(!empty($lead->tags) && is_array($lead->tags))
+                            @foreach($lead->tags as $tg)
+                                <span class="badge bg-light text-secondary border fw-medium" style="font-size: 0.7rem;">#{{ $tg }}</span>
+                            @endforeach
                         @endif
                     </div>
                     <div class="text-muted small mt-1 d-flex flex-wrap align-items-center gap-3" style="font-size: 0.78rem;">
@@ -70,6 +90,18 @@
                 <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#whatsappTemplatesModal" title="Send WhatsApp Message with Preset Templates">
                     <i class="bi bi-whatsapp"></i>
                     <span>WhatsApp</span>
+                </button>
+
+                <!-- Feature 1: EMI Calculator Button -->
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#emiCalculatorModal" title="Calculate EMI & Share Loan Options">
+                    <i class="bi bi-calculator"></i>
+                    <span>EMI Calc</span>
+                </button>
+
+                <!-- Feature 6: Branded Cost Sheet Button -->
+                <button type="button" class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#costSheetModal" title="Generate Branded Cost Sheet & Quotation">
+                    <i class="bi bi-file-earmark-spreadsheet"></i>
+                    <span>Cost Sheet</span>
                 </button>
 
                 <!-- Pipeline Status Quick Switcher (Enforces RBAC) -->
@@ -107,6 +139,55 @@
         </div>
     </div>
 </div>
+
+<!-- Cross-Project Portfolio Banner (If buyer has inquiries in other projects) -->
+@if($crossProjectLeads->isNotEmpty())
+    <div class="card mb-3 shadow-none" style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 4px solid #10b981 !important;">
+        <div class="card-body p-3">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-success text-white py-1 px-2 fw-semibold" style="font-size: 0.72rem;">
+                        <i class="bi bi-diagram-3 me-1"></i> Cross-Project Portfolio
+                    </span>
+                    <strong class="text-dark small">This buyer has {{ $crossProjectLeads->count() }} other project inquiry in your CRM:</strong>
+                </div>
+                <span class="text-muted small" style="font-size: 0.72rem;">
+                    <i class="bi bi-info-circle me-1"></i> Multi-project opportunity detected via shared phone ({{ $lead->phone }})
+                </span>
+            </div>
+
+            <div class="row g-2">
+                @foreach($crossProjectLeads as $relLead)
+                    <div class="col-md-6 col-lg-4">
+                        <div class="bg-white p-2.5 rounded border d-flex justify-content-between align-items-center shadow-none">
+                            <div class="text-truncate me-2">
+                                <div class="d-flex align-items-center gap-1.5">
+                                    <span class="text-muted fw-bold small">#{{ $relLead->id }}</span>
+                                    <strong class="text-dark small text-truncate" style="max-width: 150px;">
+                                        {{ $relLead->project?->name ?? ($relLead->enquiry_name ?? 'Other Project') }}
+                                    </strong>
+                                </div>
+                                <div class="text-muted small mt-0.5" style="font-size: 0.72rem;">
+                                    <span>{{ $relLead->property_type ?? 'Property' }} {{ $relLead->configuration ? '(' . $relLead->configuration . ')' : '' }}</span>
+                                    @if($relLead->budget_max)
+                                        · <span class="fw-semibold text-dark">₹{{ number_format($relLead->budget_max / 100000, 1) }}L</span>
+                                    @endif
+                                </div>
+                                <div class="text-muted small" style="font-size: 0.7rem;">
+                                    Agent: <span class="text-secondary fw-medium">{{ $relLead->assignedAgent?->name ?? 'Unassigned' }}</span>
+                                    · Stage: <span class="fw-semibold" style="color: {{ $relLead->status?->color }};">{{ $relLead->status?->name }}</span>
+                                </div>
+                            </div>
+                            <a href="{{ route('leads.show', $relLead->id) }}" class="btn btn-sm btn-outline-success py-1 px-2 flex-shrink-0" style="font-size: 0.72rem;" title="View Lead #{{ $relLead->id }} Details">
+                                View #{{ $relLead->id }} <i class="bi bi-arrow-right ms-0.5"></i>
+                            </a>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+@endif
 
 <!-- Main Tabs: 1) All Parameters, 2) Follow-up Calls, 3) Site Visits, 4) Audit Trail, 5) Edit Logs -->
 <div class="card mb-4">
@@ -1029,6 +1110,15 @@
                             <textarea name="notes" rows="2" class="form-control form-control-sm">{{ $lead->notes }}</textarea>
                         </div>
 
+                        <!-- Feature 5: Smart Tags -->
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-secondary mb-1">
+                                <i class="bi bi-tags text-primary me-1"></i> Smart Tags & Custom Labels (Comma-separated)
+                            </label>
+                            <input type="text" name="tags" class="form-control form-control-sm" value="{{ !empty($lead->tags) && is_array($lead->tags) ? implode(', ', $lead->tags) : '' }}" placeholder="e.g. NRI, Investor, Immediate-Possession, High Networth">
+                            <span class="text-muted" style="font-size: 0.7rem;">Tags allow rapid segment filtering and classification across campaigns and buyer personas.</span>
+                        </div>
+
                         <!-- Group 3: Marketing & Ad Attribution Tracking -->
                         <div class="col-12 mt-3">
                             <span class="text-muted fw-bold small text-uppercase d-block border-bottom pb-1" style="font-size: 0.6875rem;">
@@ -1304,6 +1394,388 @@
     </div>
 @endforeach
 
+<!-- Feature 1: Interactive Home Loan EMI & Financing Calculator Modal -->
+<div class="modal fade" id="emiCalculatorModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow rounded-3">
+            <div class="modal-header border-bottom py-3 px-4 bg-light">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-5">💰</span>
+                    <div>
+                        <h6 class="modal-title fw-bold text-dark mb-0">Home Loan EMI & Financing Calculator</h6>
+                        <span class="text-muted small" style="font-size: 0.72rem;">Calculate live monthly installments and share bank loan quote on WhatsApp</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="row g-4">
+                    <!-- Left: Sliders & Parameter Inputs -->
+                    <div class="col-md-6 border-end">
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-secondary mb-1 d-flex justify-content-between">
+                                <span>Property Purchase Price (₹)</span>
+                                <span class="text-primary fw-bold" id="emiPropPriceText">₹ 85,00,000</span>
+                            </label>
+                            @php
+                                $defaultPrice = 8500000;
+                                if (!empty($lead->budget_max) && $lead->budget_max > 0) {
+                                    $defaultPrice = $lead->budget_max > 1000 ? $lead->budget_max : $lead->budget_max * 100000;
+                                } elseif (!empty($lead->budget_min) && $lead->budget_min > 0) {
+                                    $defaultPrice = $lead->budget_min > 1000 ? $lead->budget_min : $lead->budget_min * 100000;
+                                }
+                            @endphp
+                            <input type="number" id="emiPropPrice" class="form-control form-control-sm fw-semibold" value="{{ (int)$defaultPrice }}" step="50000" oninput="calculateEMI()">
+                            <div class="d-flex gap-1 mt-1">
+                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1" style="font-size: 0.68rem;" onclick="setPropPrice(5000000)">₹50L</button>
+                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1" style="font-size: 0.68rem;" onclick="setPropPrice(7500000)">₹75L</button>
+                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1" style="font-size: 0.68rem;" onclick="setPropPrice(10000000)">₹1Cr</button>
+                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1" style="font-size: 0.68rem;" onclick="setPropPrice(15000000)">₹1.5Cr</button>
+                                <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1" style="font-size: 0.68rem;" onclick="setPropPrice(20000000)">₹2Cr</button>
+                            </div>
+                        </div>
+
+                        <!-- Down Payment Slider -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-semibold text-secondary mb-0">Down Payment</label>
+                                <span class="badge bg-light text-dark border fw-bold" id="emiDownPayBadge">20% (₹ 17,00,000)</span>
+                            </div>
+                            <input type="range" class="form-range" id="emiDownPayPct" min="10" max="50" step="5" value="20" oninput="calculateEMI()">
+                            <div class="d-flex justify-content-between text-muted" style="font-size: 0.68rem;">
+                                <span>10% (Min)</span>
+                                <span>25%</span>
+                                <span>50% (Max)</span>
+                            </div>
+                        </div>
+
+                        <!-- Loan Tenure Slider -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-semibold text-secondary mb-0">Loan Tenure</label>
+                                <span class="badge bg-light text-dark border fw-bold" id="emiTenureBadge">20 Years</span>
+                            </div>
+                            <input type="range" class="form-range" id="emiTenure" min="5" max="30" step="1" value="20" oninput="calculateEMI()">
+                            <div class="d-flex justify-content-between text-muted" style="font-size: 0.68rem;">
+                                <span>5 Yrs</span>
+                                <span>15 Yrs</span>
+                                <span>30 Yrs</span>
+                            </div>
+                        </div>
+
+                        <!-- Interest Rate Slider -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label small fw-semibold text-secondary mb-0">Interest Rate (% p.a.)</label>
+                                <span class="badge bg-primary text-white fw-bold" id="emiRateBadge">8.50%</span>
+                            </div>
+                            <input type="range" class="form-range" id="emiRate" min="6.5" max="14.0" step="0.1" value="8.5" oninput="calculateEMI()">
+                            <div class="d-flex justify-content-between text-muted" style="font-size: 0.68rem;">
+                                <span>6.5%</span>
+                                <span>8.5% (Market Avg)</span>
+                                <span>14.0%</span>
+                            </div>
+                        </div>
+
+                        <!-- Bank Quick Select -->
+                        <div>
+                            <span class="text-muted small d-block mb-1" style="font-size: 0.7rem;">Bank Tie-up Benchmark Rates:</span>
+                            <div class="d-flex gap-1 flex-wrap">
+                                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2" style="font-size: 0.68rem;" onclick="setBankRate(8.50, 'SBI Home Finance')">SBI: 8.50%</button>
+                                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2" style="font-size: 0.68rem;" onclick="setBankRate(8.60, 'HDFC Bank')">HDFC: 8.60%</button>
+                                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2" style="font-size: 0.68rem;" onclick="setBankRate(8.75, 'ICICI Bank')">ICICI: 8.75%</button>
+                                <button type="button" class="btn btn-xs btn-outline-primary py-0 px-2" style="font-size: 0.68rem;" onclick="setBankRate(8.85, 'Axis Bank')">Axis: 8.85%</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Visual Outcome & Schedule -->
+                    <div class="col-md-6 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="bg-primary-subtle border border-primary-subtle rounded-3 p-3 text-center mb-3">
+                                <span class="text-secondary small fw-semibold text-uppercase d-block" style="letter-spacing: 0.05em; font-size: 0.72rem;">Estimated Monthly Installment (EMI)</span>
+                                <h3 class="fw-bold text-primary mb-0 my-1" id="emiMonthlyDisplay">₹ 59,008</h3>
+                                <span class="text-muted small" style="font-size: 0.7rem;">per month for <span id="emiMonthsText">240</span> months</span>
+                            </div>
+
+                            <table class="table table-sm table-bordered align-middle mb-3" style="font-size: 0.78rem;">
+                                <tbody>
+                                    <tr>
+                                        <td class="text-muted" style="width: 50%;">Down Payment Required:</td>
+                                        <td class="fw-bold text-dark text-end" id="emiDownPayVal">₹ 17,00,000</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted">Net Home Loan Principal:</td>
+                                        <td class="fw-bold text-dark text-end" id="emiLoanPrincipalVal">₹ 68,00,000</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-muted">Total Interest Amount:</td>
+                                        <td class="fw-bold text-danger text-end" id="emiTotalInterestVal">₹ 73,61,920</td>
+                                    </tr>
+                                    <tr class="table-light">
+                                        <td class="fw-bold text-dark">Total Repayment (Principal + Interest):</td>
+                                        <td class="fw-bold text-success text-end" id="emiTotalRepaymentVal">₹ 1,41,61,920</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <!-- Visual Stacked Bar -->
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between small text-muted mb-1" style="font-size: 0.7rem;">
+                                    <span>Principal: <strong class="text-primary" id="emiPrincipalPctText">48%</strong></span>
+                                    <span>Interest: <strong class="text-danger" id="emiInterestPctText">52%</strong></span>
+                                </div>
+                                <div class="progress" style="height: 10px;">
+                                    <div class="progress-bar bg-primary" id="emiPrincipalBar" role="progressbar" style="width: 48%;"></div>
+                                    <div class="progress-bar bg-danger" id="emiInterestBar" role="progressbar" style="width: 52%;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 1-Click WhatsApp Share -->
+                        <div class="border-top pt-3">
+                            <button type="button" class="btn btn-success w-100 fw-semibold d-flex align-items-center justify-content-center gap-2 py-2" onclick="shareEMIWhatsApp()">
+                                <i class="bi bi-whatsapp fs-6"></i>
+                                <span>Share EMI Breakdown with {{ $lead->name }}</span>
+                            </button>
+                            <span class="text-muted small d-block text-center mt-1" style="font-size: 0.68rem;">Sends clean, personalized EMI quotation directly to {{ $lead->phone }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-top py-2 px-4">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Feature 6: Branded Real Estate Cost Sheet & Quotation Generator Modal -->
+<div class="modal fade" id="costSheetModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow rounded-3">
+            <div class="modal-header border-bottom py-3 px-4 bg-light d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="fs-5">📄</span>
+                    <div>
+                        <h6 class="modal-title fw-bold text-dark mb-0">Official Property Cost Sheet & Quotation</h6>
+                        <span class="text-muted small" style="font-size: 0.72rem;">All-inclusive pricing breakdown with agreement value, stamp duty, GST & parking</span>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-dark" onclick="printCostSheet()">
+                        <i class="bi bi-printer me-1"></i> Print / PDF
+                    </button>
+                    <button type="button" class="btn btn-sm btn-success" onclick="shareCostSheetWhatsApp()">
+                        <i class="bi bi-whatsapp me-1"></i> WhatsApp
+                    </button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+            </div>
+
+            <!-- Cost Sheet Printable Area -->
+            <div class="modal-body p-4" id="printableCostSheet">
+                <!-- Quotation Letterhead -->
+                <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-3">
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="fs-4 text-primary">🏢</span>
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">EstatePulse Realty Group</h5>
+                                <span class="text-muted small" style="font-size: 0.72rem;">Premier Real Estate Developers & Advisory | RERA Registered</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge bg-light text-secondary border fw-semibold mb-1">OFFICIAL ESTIMATE</span>
+                        <div class="text-muted small" style="font-size: 0.72rem;">Ref #: EP-QUOTE-{{ $lead->id }}-{{ date('Ymd') }}</div>
+                        <div class="text-muted small" style="font-size: 0.72rem;">Date: {{ now()->format('d M Y') }}</div>
+                    </div>
+                </div>
+
+                <!-- Customer & Property Header -->
+                <div class="row g-2 mb-3 bg-light rounded p-2 border" style="font-size: 0.78rem;">
+                    <div class="col-sm-6">
+                        <span class="text-muted d-block" style="font-size: 0.7rem;">Client Name:</span>
+                        <strong class="text-dark">{{ $lead->name }}</strong>
+                        <div class="text-muted" style="font-size: 0.72rem;">Ph: {{ $lead->phone }} @if($lead->email) | {{ $lead->email }} @endif</div>
+                    </div>
+                    <div class="col-sm-6 text-sm-end">
+                        <span class="text-muted d-block" style="font-size: 0.7rem;">Project & Unit:</span>
+                        <strong class="text-primary">{{ $lead->project?->name ?? ($lead->enquiry_name ?? 'Premier Luxury Residences') }}</strong>
+                        <div class="text-muted" style="font-size: 0.72rem;">Type: {{ $lead->configuration ?? '2 BHK' }} ({{ $lead->property_type ?? 'Apartment' }})</div>
+                    </div>
+                </div>
+
+                @php
+                    $leadBudget = 8500000;
+                    if (!empty($lead->budget_max) && $lead->budget_max > 0) {
+                        $leadBudget = $lead->budget_max > 1000 ? $lead->budget_max : $lead->budget_max * 100000;
+                    } elseif (!empty($lead->budget_min) && $lead->budget_min > 0) {
+                        $leadBudget = $lead->budget_min > 1000 ? $lead->budget_min : $lead->budget_min * 100000;
+                    }
+                    $basePrice = round($leadBudget * 0.85);
+                    $floorRise = round($leadBudget * 0.03);
+                    $carParking = 350000;
+                    $clubHouse = 200000;
+                    $agreementValue = $basePrice + $floorRise + $carParking + $clubHouse;
+
+                    // Statutory & Govt taxes
+                    $stampDuty = round($agreementValue * 0.05); // 5%
+                    $registration = 30000;
+                    $gst = round($agreementValue * 0.05); // 5%
+                    $advanceMaint = 120000;
+                    $grandTotal = $agreementValue + $stampDuty + $registration + $gst + $advanceMaint;
+                @endphp
+
+                <!-- Itemized Cost Breakdown Table -->
+                <div class="table-responsive mb-3">
+                    <table class="table table-sm table-bordered align-middle mb-0" style="font-size: 0.78rem;">
+                        <thead class="table-light">
+                            <tr>
+                                <th style="width: 8%;" class="text-center">Sr.</th>
+                                <th style="width: 57%;">Particulars / Component Description</th>
+                                <th style="width: 35%;" class="text-end">Amount (INR ₹)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="text-center">1</td>
+                                <td>
+                                    <strong class="text-dark">Base Consideration Value</strong>
+                                    <span class="text-muted d-block small" style="font-size: 0.7rem;">Carpet Area consideration rate based on master developer tier</span>
+                                </td>
+                                <td class="text-end fw-semibold">₹ {{ number_format($basePrice) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-center">2</td>
+                                <td>
+                                    <strong>Floor Rise Charges (Middle to Higher Floors)</strong>
+                                    <span class="text-muted d-block small" style="font-size: 0.7rem;">Premium per sqft for panoramic elevation & view</span>
+                                </td>
+                                <td class="text-end fw-semibold">₹ {{ number_format($floorRise) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-center">3</td>
+                                <td>
+                                    <strong>Exclusive Covered Car Parking Space</strong>
+                                    <span class="text-muted d-block small" style="font-size: 0.7rem;">Reserved stilt / basement car parking slot</span>
+                                </td>
+                                <td class="text-end fw-semibold">₹ {{ number_format($carParking) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-center">4</td>
+                                <td>
+                                    <strong>Clubhouse & Infrastructure Development Charges</strong>
+                                    <span class="text-muted d-block small" style="font-size: 0.7rem;">Gymnasium, swimming pool, power backup & DG infrastructure</span>
+                                </td>
+                                <td class="text-end fw-semibold">₹ {{ number_format($clubHouse) }}</td>
+                            </tr>
+                            <tr class="table-primary fw-bold">
+                                <td class="text-center">A</td>
+                                <td class="text-dark">SUB-TOTAL: AGREEMENT VALUE</td>
+                                <td class="text-end text-primary" style="font-size: 0.85rem;">₹ {{ number_format($agreementValue) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-center">5</td>
+                                <td>
+                                    <strong>Stamp Duty Charges (5% of Agreement Value)</strong>
+                                    <span class="text-muted d-block small" style="font-size: 0.7rem;">Payable directly to State Revenue Dept at time of registration</span>
+                                </td>
+                                <td class="text-end fw-semibold text-danger">₹ {{ number_format($stampDuty) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-center">6</td>
+                                <td>
+                                    <strong>Government Registration & Document Charges</strong>
+                                    <span class="text-muted d-block small" style="font-size: 0.7rem;">Standard govt registration fee and e-filing scan dues</span>
+                                </td>
+                                <td class="text-end fw-semibold text-danger">₹ {{ number_format($registration) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-center">7</td>
+                                <td>
+                                    <strong>Goods & Services Tax (GST @ 5%)</strong>
+                                    <span class="text-muted d-block small" style="font-size: 0.7rem;">Applicable on under-construction real estate units without ITC</span>
+                                </td>
+                                <td class="text-end fw-semibold text-danger">₹ {{ number_format($gst) }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-center">8</td>
+                                <td>
+                                    <strong>Advance Maintenance & Society Sinking Deposit</strong>
+                                    <span class="text-muted d-block small" style="font-size: 0.7rem;">12-month advance common area maintenance & water connection</span>
+                                </td>
+                                <td class="text-end fw-semibold">₹ {{ number_format($advanceMaint) }}</td>
+                            </tr>
+                            <tr class="table-success fw-bold">
+                                <td class="text-center">★</td>
+                                <td class="text-dark fs-6">ALL-INCLUSIVE ON-ROAD ESTIMATED TOTAL</td>
+                                <td class="text-end text-success fs-6">₹ {{ number_format($grandTotal) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Construction-Linked Payment Milestones -->
+                <div class="border rounded p-3 bg-light mb-3">
+                    <span class="fw-bold text-dark small text-uppercase d-block mb-2" style="font-size: 0.72rem; letter-spacing: 0.05em;">
+                        Standard Construction Linked Payment Schedule (CLP)
+                    </span>
+                    <div class="row g-2 text-center" style="font-size: 0.72rem;">
+                        <div class="col">
+                            <div class="bg-white p-2 rounded border">
+                                <span class="text-muted d-block">Booking Token</span>
+                                <strong class="text-dark">10%</strong>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="bg-white p-2 rounded border">
+                                <span class="text-muted d-block">On Agreement</span>
+                                <strong class="text-dark">10%</strong>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="bg-white p-2 rounded border">
+                                <span class="text-muted d-block">Plinth Completion</span>
+                                <strong class="text-dark">15%</strong>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="bg-white p-2 rounded border">
+                                <span class="text-muted d-block">Slab Stages</span>
+                                <strong class="text-dark">35%</strong>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="bg-white p-2 rounded border">
+                                <span class="text-muted d-block">Finishing & MEP</span>
+                                <strong class="text-dark">20%</strong>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="bg-white p-2 rounded border">
+                                <span class="text-muted d-block">On Handover</span>
+                                <strong class="text-dark">10%</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Footer Terms -->
+                <div class="d-flex justify-content-between align-items-center text-muted small" style="font-size: 0.68rem;">
+                    <span>* Prices are subject to revision without prior notice. Govt taxes are indicative and subject to prevailing norms.</span>
+                    <span>Prepared by: <strong>{{ Auth::user()->name }}</strong> (Sales Executive)</span>
+                </div>
+            </div>
+
+            <div class="modal-footer border-top py-2 px-4">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 const waLeadData = {
     name: "{{ addslashes($lead->name) }}",
@@ -1343,7 +1815,138 @@ document.addEventListener('DOMContentLoaded', function() {
     if (waText && waTemplates[1]) {
         waText.value = waTemplates[1];
     }
+    // Initialize EMI calculator
+    calculateEMI();
 });
+
+// Feature 1: Live EMI Calculation Engine
+function formatINR(val) {
+    return '₹ ' + Math.round(val).toLocaleString('en-IN');
+}
+
+function calculateEMI() {
+    const price = parseFloat(document.getElementById('emiPropPrice').value) || 0;
+    const downPct = parseFloat(document.getElementById('emiDownPayPct').value) || 20;
+    const tenureYrs = parseFloat(document.getElementById('emiTenure').value) || 20;
+    const annualRate = parseFloat(document.getElementById('emiRate').value) || 8.5;
+
+    // Update Label texts
+    document.getElementById('emiPropPriceText').innerText = formatINR(price);
+    const downAmt = (price * downPct) / 100;
+    document.getElementById('emiDownPayBadge').innerText = `${downPct}% (${formatINR(downAmt)})`;
+    document.getElementById('emiDownPayVal').innerText = formatINR(downAmt);
+
+    const principal = Math.max(0, price - downAmt);
+    document.getElementById('emiLoanPrincipalVal').innerText = formatINR(principal);
+    document.getElementById('emiTenureBadge').innerText = `${tenureYrs} Years (${tenureYrs * 12} Months)`;
+    document.getElementById('emiMonthsText').innerText = tenureYrs * 12;
+    document.getElementById('emiRateBadge').innerText = `${annualRate.toFixed(2)}%`;
+
+    if (principal <= 0) {
+        document.getElementById('emiMonthlyDisplay').innerText = '₹ 0';
+        document.getElementById('emiTotalInterestVal').innerText = '₹ 0';
+        document.getElementById('emiTotalRepaymentVal').innerText = '₹ 0';
+        return;
+    }
+
+    const monthlyRate = annualRate / (12 * 100);
+    const totalMonths = tenureYrs * 12;
+
+    // EMI = [P x R x (1+R)^N]/[(1+R)^N-1]
+    const emi = (principal * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) / (Math.pow(1 + monthlyRate, totalMonths) - 1);
+    const totalRepay = emi * totalMonths;
+    const totalInterest = Math.max(0, totalRepay - principal);
+
+    document.getElementById('emiMonthlyDisplay').innerText = formatINR(emi) + ' / mo';
+    document.getElementById('emiTotalInterestVal').innerText = formatINR(totalInterest);
+    document.getElementById('emiTotalRepaymentVal').innerText = formatINR(totalRepay);
+
+    // Visual Bar percentages
+    const principalPct = Math.round((principal / totalRepay) * 100) || 50;
+    const interestPct = Math.max(0, 100 - principalPct);
+    document.getElementById('emiPrincipalPctText').innerText = `${principalPct}%`;
+    document.getElementById('emiInterestPctText').innerText = `${interestPct}%`;
+    document.getElementById('emiPrincipalBar').style.width = `${principalPct}%`;
+    document.getElementById('emiInterestBar').style.width = `${interestPct}%`;
+}
+
+function setPropPrice(val) {
+    document.getElementById('emiPropPrice').value = val;
+    calculateEMI();
+}
+
+function setBankRate(rate, bankName) {
+    document.getElementById('emiRate').value = rate;
+    calculateEMI();
+}
+
+function shareEMIWhatsApp() {
+    const price = document.getElementById('emiPropPriceText').innerText;
+    const downPay = document.getElementById('emiDownPayVal').innerText;
+    const loan = document.getElementById('emiLoanPrincipalVal').innerText;
+    const tenure = document.getElementById('emiTenureBadge').innerText;
+    const rate = document.getElementById('emiRateBadge').innerText;
+    const emi = document.getElementById('emiMonthlyDisplay').innerText;
+    const interest = document.getElementById('emiTotalInterestVal').innerText;
+    const total = document.getElementById('emiTotalRepaymentVal').innerText;
+
+    const msg = `*EstatePulse Realty - Home Loan Financing Estimate*\n\n` +
+        `Dear *${waLeadData.name}*,\n` +
+        `Here is the estimated Home Loan EMI Breakdown for *${waLeadData.project}* (${waLeadData.config}):\n\n` +
+        `🏡 *Property Value:* ${price}\n` +
+        `💵 *Down Payment:* ${downPay}\n` +
+        `🏦 *Bank Loan Principal:* ${loan}\n` +
+        `📅 *Tenure:* ${tenure} @ ${rate} p.a.\n\n` +
+        `✨ *Estimated Monthly EMI: ${emi}*\n\n` +
+        `📊 *Total Interest:* ${interest}\n` +
+        `💰 *Total Repayment:* ${total}\n\n` +
+        `We have instant sanction banking tie-ups with SBI, HDFC & ICICI Bank. Please let us know if you'd like our home loan specialist to assist with pre-approval.\n\n` +
+        `Best regards,\n${waLeadData.agent} | EstatePulse Realty`;
+
+    const phone = waLeadData.phone.length === 10 ? '91' + waLeadData.phone : waLeadData.phone;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
+// Feature 6: Branded Cost Sheet Actions
+function printCostSheet() {
+    const printContent = document.getElementById('printableCostSheet').innerHTML;
+    const printWindow = window.open('', '', 'height=850,width=920');
+    printWindow.document.write('<html><head><title>Cost Sheet - ' + waLeadData.name + '</title>');
+    printWindow.document.write('<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">');
+    printWindow.document.write('<style>body { font-family: Inter, sans-serif; padding: 25px; color: #1e293b; } .table { font-size: 12px; } @page { margin: 12mm; }</style>');
+    printWindow.document.write('</head><body>');
+    printWindow.document.write(printContent);
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+    }, 450);
+}
+
+function shareCostSheetWhatsApp() {
+    const agreement = "{{ number_format($agreementValue) }}";
+    const stamp = "{{ number_format($stampDuty) }}";
+    const gst = "{{ number_format($gst) }}";
+    const grand = "{{ number_format($grandTotal) }}";
+
+    const msg = `*EstatePulse Realty - Official Property Cost Sheet*\n\n` +
+        `Dear *${waLeadData.name}*,\n` +
+        `Greetings! Here is the itemized cost quotation for *${waLeadData.project}* (${waLeadData.config}):\n\n` +
+        `📑 *Agreement Value:* ₹ ${agreement}\n` +
+        `🏛️ *Stamp Duty (5%) + Govt Reg:* ₹ ${stamp} + ₹ 30,000\n` +
+        `⚖️ *GST (5%):* ₹ ${gst}\n` +
+        `-----------------------------------------\n` +
+        `💎 *All-Inclusive On-Road Total: ₹ ${grand}*\n` +
+        `-----------------------------------------\n\n` +
+        `Includes reserved covered car parking, club house privileges, and infrastructure fees.\n` +
+        `Flexible construction-linked payment plan (CLP) available.\n\n` +
+        `Best regards,\n${waLeadData.agent} | EstatePulse Realty`;
+
+    const phone = waLeadData.phone.length === 10 ? '91' + waLeadData.phone : waLeadData.phone;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+}
 </script>
 
 @endsection

@@ -35,4 +35,9 @@ class Project extends Model
     {
         return $this->hasMany(SiteVisit::class, 'project_id');
     }
+
+    public function units()
+    {
+        return $this->hasMany(ProjectUnit::class, 'project_id')->orderBy('floor', 'desc')->orderBy('unit_number', 'asc');
+    }
 }

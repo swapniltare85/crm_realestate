@@ -9,6 +9,7 @@ use App\Models\LeadSource;
 use App\Models\LeadStatus;
 use App\Models\Project;
 use App\Models\SiteVisit;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -64,6 +65,47 @@ class DashboardController extends Controller
             }
         }])->get();
 
+        // Feature 4: Sales Team Leaderboard & Performance Gamification
+        $salesAgents = User::whereIn('role', ['sales_agent', 'manager'])
+            ->where('status', 'active')
+            ->with(['assignedLeads.status', 'followups', 'siteVisits'])
+            ->get();
+
+        $wonStatusId = $wonStatus?->id;
+
+        $leaderboard = $salesAgents->map(function ($agent) use ($wonStatusId) {
+            $totalLeads = $agent->assignedLeads->count();
+            $wonLeads = $agent->assignedLeads->where('status_id', $wonStatusId);
+            $wonCount = $wonLeads->count();
+            $callsCount = $agent->followups->count();
+            $visitsCount = $agent->siteVisits->count();
+            $completedVisits = $agent->siteVisits->where('status', 'completed')->count();
+
+            // Estimated revenue booked
+            $revenueBooked = $wonLeads->sum(function($l) {
+                return $l->budget_max ?: ($l->budget_min ?: 7500000);
+            });
+
+            // Gamification points: 100 per won deal + 25 per site visit + 5 per call logged
+            $points = ($wonCount * 100) + ($visitsCount * 25) + ($callsCount * 5);
+            $conversionRate = $totalLeads > 0 ? round(($wonCount / $totalLeads) * 100, 1) : 0;
+
+            return (object) [
+                'id' => $agent->id,
+                'name' => $agent->name,
+                'email' => $agent->email,
+                'role' => $agent->role,
+                'total_leads' => $totalLeads,
+                'won_deals' => $wonCount,
+                'calls_logged' => $callsCount,
+                'site_visits' => $visitsCount,
+                'completed_visits' => $completedVisits,
+                'revenue_booked' => $revenueBooked,
+                'conversion_rate' => $conversionRate,
+                'points' => $points,
+            ];
+        })->sortByDesc('points')->values();
+
         return view('dashboard', compact(
             'totalLeads',
             'newLeadsToday',
@@ -75,7 +117,8 @@ class DashboardController extends Controller
             'statuses',
             'sources',
             'isAgent',
-            'user'
+            'user',
+            'leaderboard'
         ));
     }
 }
