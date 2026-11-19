@@ -41,4 +41,9 @@ class ProjectUnit extends Model
     {
         return $this->belongsTo(Lead::class, 'booked_lead_id');
     }
+
+    public function booking()
+    {
+        return $this->hasOne(Booking::class, 'unit_id')->latestOfMany();
+    }
 }

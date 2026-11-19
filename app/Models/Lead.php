@@ -177,6 +177,16 @@ class Lead extends Model
         return $this->hasMany(LeadActivity::class, 'lead_id')->latest('created_at');
     }
 
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class, 'lead_id')->latest('id');
+    }
+
+    public function latestBooking()
+    {
+        return $this->hasOne(Booking::class, 'lead_id')->latestOfMany();
+    }
+
     /**
      * Cross-Project Portfolio: Find other inquiries by the same buyer across different projects
      */

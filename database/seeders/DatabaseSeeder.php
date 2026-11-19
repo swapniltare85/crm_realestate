@@ -2,12 +2,16 @@
 
 namespace Database\Seeders;
 
+use App\Models\AgentCommission;
+use App\Models\Booking;
 use App\Models\Lead;
 use App\Models\LeadActivity;
 use App\Models\LeadFollowup;
 use App\Models\LeadSource;
 use App\Models\LeadStatus;
+use App\Models\PaymentMilestone;
 use App\Models\Project;
+use App\Models\ProjectUnit;
 use App\Models\SiteVisit;
 use App\Models\User;
 use Illuminate\Database\Seeder;
@@ -254,6 +258,101 @@ class DatabaseSeeder extends Seeder
                     'client_feedback' => null,
                 ]);
             }
+        }
+
+        // 6. Create Sample Units for Emerald Heights
+        $emerald = $createdProjects[0];
+        $unit101 = ProjectUnit::firstOrCreate(
+            ['project_id' => $emerald->id, 'unit_number' => '101'],
+            ['tower' => 'Wing A', 'floor' => 1, 'configuration' => '2 BHK', 'carpet_area' => 850, 'base_price' => 13500000, 'status' => 'available']
+        );
+        $unit102 = ProjectUnit::firstOrCreate(
+            ['project_id' => $emerald->id, 'unit_number' => '102'],
+            ['tower' => 'Wing A', 'floor' => 1, 'configuration' => '2 BHK', 'carpet_area' => 880, 'base_price' => 14000000, 'status' => 'available']
+        );
+        $unit702 = ProjectUnit::firstOrCreate(
+            ['project_id' => $emerald->id, 'unit_number' => '702'],
+            ['tower' => 'Wing A', 'floor' => 7, 'configuration' => '3 BHK', 'carpet_area' => 1350, 'base_price' => 18500000, 'status' => 'sold']
+        );
+        $unit1204 = ProjectUnit::firstOrCreate(
+            ['project_id' => $emerald->id, 'unit_number' => '1204'],
+            ['tower' => 'Wing B', 'floor' => 12, 'configuration' => '4 BHK Penthouse', 'carpet_area' => 2200, 'base_price' => 28000000, 'status' => 'available']
+        );
+
+        // 7. Seed Sample Confirmed Booking for Won Lead (Vikram Singhania)
+        $wonLead = Lead::where('phone', '9819988776')->first();
+        if ($wonLead) {
+            $booking = Booking::firstOrCreate(
+                ['booking_reference' => 'BK-2026-0001'],
+                [
+                    'lead_id' => $wonLead->id,
+                    'project_id' => $emerald->id,
+                    'unit_id' => $unit702->id,
+                    'agent_id' => $agent1->id,
+                    'customer_name' => $wonLead->name,
+                    'customer_phone' => $wonLead->phone,
+                    'customer_email' => $wonLead->email,
+                    'agreement_value' => 18500000,
+                    'token_amount' => 500000,
+                    'booking_date' => now()->subDays(10)->toDateString(),
+                    'status' => 'confirmed',
+                    'payment_status' => 'partially_paid',
+                    'notes' => 'Token received via HDFC Cheque #492810. Stamp duty and registration in progress.',
+                ]
+            );
+
+            // Link unit to booking
+            $unit702->update([
+                'status' => 'sold',
+                'booked_lead_id' => $wonLead->id,
+                'token_amount' => 500000,
+                'booked_at' => now()->subDays(10),
+            ]);
+
+            // Seed construction milestones
+            $milestones = [
+                ['name' => '1. Booking & Token Amount (10%)', 'pct' => 10, 'amount' => 1850000, 'status' => 'paid', 'due' => now()->subDays(10), 'paid' => now()->subDays(10), 'ref' => 'HDFC Cheque #492810', 'method' => 'Cheque'],
+                ['name' => '2. Agreement & Registration (10%)', 'pct' => 10, 'amount' => 1850000, 'status' => 'due', 'due' => now()->addDays(15), 'paid' => null, 'ref' => null, 'method' => null],
+                ['name' => '3. Plinth Level Completion (20%)', 'pct' => 20, 'amount' => 3700000, 'status' => 'pending', 'due' => now()->addDays(75), 'paid' => null, 'ref' => null, 'method' => null],
+                ['name' => '4. RCC Slabs & Structure (25%)', 'pct' => 25, 'amount' => 4625000, 'status' => 'pending', 'due' => now()->addDays(165), 'paid' => null, 'ref' => null, 'method' => null],
+                ['name' => '5. Brickwork, Flooring & Finishing (20%)', 'pct' => 20, 'amount' => 3700000, 'status' => 'pending', 'due' => now()->addDays(255), 'paid' => null, 'ref' => null, 'method' => null],
+                ['name' => '6. Final Possession & Key Handover (15%)', 'pct' => 15, 'amount' => 2775000, 'status' => 'pending', 'due' => now()->addDays(350), 'paid' => null, 'ref' => null, 'method' => null],
+            ];
+
+            foreach ($milestones as $i => $m) {
+                PaymentMilestone::firstOrCreate(
+                    ['booking_id' => $booking->id, 'stage_order' => $i + 1],
+                    [
+                        'milestone_name' => $m['name'],
+                        'percentage' => $m['pct'],
+                        'amount' => $m['amount'],
+                        'due_date' => $m['due'],
+                        'paid_date' => $m['paid'],
+                        'status' => $m['status'],
+                        'payment_method' => $m['method'],
+                        'transaction_reference' => $m['ref'],
+                    ]
+                );
+            }
+
+            // Seed Agent Commission
+            AgentCommission::firstOrCreate(
+                ['booking_id' => $booking->id],
+                [
+                    'agent_id' => $agent1->id,
+                    'commission_type' => 'internal_agent',
+                    'deal_value' => 18500000,
+                    'commission_percentage' => 1.50,
+                    'commission_amount' => 277500,
+                    'tds_percentage' => 5.00,
+                    'tds_amount' => 13875,
+                    'net_payable' => 263625,
+                    'status' => 'approved',
+                    'approved_by' => $admin->id,
+                    'approved_at' => now()->subDays(5),
+                    'notes' => '1.5% deal incentive approved for Wing A Unit 702 closure.',
+                ]
+            );
         }
     }
 }

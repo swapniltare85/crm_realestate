@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
 use App\Models\Lead;
 use App\Models\LeadFollowup;
 use App\Models\LeadSource;
@@ -106,6 +107,22 @@ class DashboardController extends Controller
             ];
         })->sortByDesc('points')->values();
 
+        // Confirmed Property Bookings Stats
+        $totalBookings = 0;
+        $totalBookingRevenue = 0;
+        $recentBookings = collect();
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('bookings')) {
+                $bQuery = Booking::where('status', '!=', 'cancelled');
+                if ($isAgent) {
+                    $bQuery->where('agent_id', $user->id);
+                }
+                $totalBookings = (clone $bQuery)->count();
+                $totalBookingRevenue = (clone $bQuery)->sum('agreement_value');
+                $recentBookings = (clone $bQuery)->with(['project', 'unit', 'agent'])->latest('id')->take(5)->get();
+            }
+        } catch (\Throwable $e) {}
+
         return view('dashboard', compact(
             'totalLeads',
             'newLeadsToday',
@@ -118,7 +135,10 @@ class DashboardController extends Controller
             'sources',
             'isAgent',
             'user',
-            'leaderboard'
+            'leaderboard',
+            'totalBookings',
+            'totalBookingRevenue',
+            'recentBookings'
         ));
     }
 }

@@ -65,6 +65,16 @@ class User extends Authenticatable
         return $this->hasMany(SiteVisit::class, 'assigned_to');
     }
 
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class, 'agent_id')->latest('id');
+    }
+
+    public function commissions()
+    {
+        return $this->hasMany(AgentCommission::class, 'agent_id')->latest('id');
+    }
+
     /**
      * RBAC Role Helper Methods
      */

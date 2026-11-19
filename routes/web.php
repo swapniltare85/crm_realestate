@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\BookingWebController;
+use App\Http\Controllers\Web\CommissionWebController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\LeadImportExportController;
 use App\Http\Controllers\Web\LeadWebController;
@@ -46,6 +48,24 @@ Route::middleware('auth')->group(function () {
     Route::get('/projects', [ProjectWebController::class, 'index'])->name('projects.index');
     Route::post('/projects', [ProjectWebController::class, 'store'])->name('projects.store');
     Route::post('/projects/units/{id}/status', [ProjectWebController::class, 'updateUnitStatus'])->name('projects.units.status');
+
+    // Property Bookings & Payment Milestones Module
+    Route::prefix('bookings')->name('bookings.')->group(function () {
+        Route::get('/', [BookingWebController::class, 'index'])->name('index');
+        Route::get('/create', [BookingWebController::class, 'create'])->name('create');
+        Route::post('/', [BookingWebController::class, 'store'])->name('store');
+        Route::get('/{id}', [BookingWebController::class, 'show'])->name('show');
+        Route::post('/{id}/status', [BookingWebController::class, 'updateStatus'])->name('update-status');
+        Route::post('/{id}/milestones/{milestoneId}/pay', [BookingWebController::class, 'recordMilestonePayment'])->name('milestones.pay');
+        Route::post('/{id}/milestones', [BookingWebController::class, 'addCustomMilestone'])->name('milestones.store');
+    });
+
+    // Agent Commission & Incentive Tracker Module
+    Route::prefix('commissions')->name('commissions.')->group(function () {
+        Route::get('/', [CommissionWebController::class, 'index'])->name('index');
+        Route::post('/{id}/approve', [CommissionWebController::class, 'approve'])->name('approve');
+        Route::post('/{id}/disburse', [CommissionWebController::class, 'disburse'])->name('disburse');
+    });
 
     // Admin Team & Users Management (Only accessible by Admin role)
     Route::prefix('users')->name('users.')->middleware(\App\Http\Middleware\EnsureAdmin::class)->group(function () {

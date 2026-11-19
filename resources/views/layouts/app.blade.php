@@ -425,6 +425,14 @@
                     <i class="bi bi-building"></i>
                     <span>Projects & Inventory</span>
                 </a>
+                <a class="nav-link {{ request()->routeIs('bookings.*') ? 'active' : '' }}" href="{{ route('bookings.index') }}">
+                    <i class="bi bi-receipt-cutoff"></i>
+                    <span>Bookings & Milestones</span>
+                </a>
+                <a class="nav-link {{ request()->routeIs('commissions.*') ? 'active' : '' }}" href="{{ route('commissions.index') }}">
+                    <i class="bi bi-cash-stack"></i>
+                    <span>Agent Commissions</span>
+                </a>
             </nav>
 
             @if(Auth::check() && Auth::user()->role === 'admin')

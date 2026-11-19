@@ -104,6 +104,19 @@
                     <span>Cost Sheet</span>
                 </button>
 
+                <!-- Feature: Property Booking & Milestones -->
+                @if($lead->latestBooking)
+                    <a href="{{ route('bookings.show', $lead->latestBooking->id) }}" class="btn btn-sm btn-success fw-semibold" title="View Confirmed Property Booking">
+                        <i class="bi bi-receipt-cutoff"></i>
+                        <span>Booking ({{ $lead->latestBooking->booking_reference }})</span>
+                    </a>
+                @else
+                    <a href="{{ route('bookings.create', ['lead_id' => $lead->id]) }}" class="btn btn-sm btn-primary fw-semibold" title="Convert Lead into Confirmed Property Booking">
+                        <i class="bi bi-cash-coin"></i>
+                        <span>Book Property</span>
+                    </a>
+                @endif
+
                 <!-- Pipeline Status Quick Switcher (Enforces RBAC) -->
                 @if($canEdit)
                     <form action="{{ route('leads.update-status', $lead->id) }}" method="POST" class="d-inline">
@@ -206,6 +219,11 @@
             <li class="nav-item" role="presentation">
                 <button class="nav-link fw-semibold small py-3 px-3 border-0 rounded-0" id="visits-tab" data-bs-toggle="tab" data-bs-target="#visitsTabPane" type="button" role="tab">
                     <i class="bi bi-calendar2-check me-1 text-warning"></i> Site Visits ({{ $lead->siteVisits->count() }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold small py-3 px-3 border-0 rounded-0" id="bookings-tab" data-bs-toggle="tab" data-bs-target="#bookingsTabPane" type="button" role="tab">
+                    <i class="bi bi-receipt-cutoff me-1 text-success"></i> Property Bookings ({{ $lead->bookings->count() }})
                 </button>
             </li>
             <li class="nav-item" role="presentation">
@@ -760,6 +778,84 @@
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- TAB: PROPERTY BOOKINGS & MILESTONES -->
+            <div class="tab-pane fade" id="bookingsTabPane" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-wrap gap-2">
+                    <div>
+                        <h6 class="fw-bold text-dark mb-1">
+                            <i class="bi bi-receipt-cutoff text-success me-1"></i> Confirmed Property Bookings & Milestones
+                        </h6>
+                        <p class="text-muted small mb-0">Track closed property sales, unit allocation, and construction payment schedule for this customer.</p>
+                    </div>
+                    <a href="{{ route('bookings.create', ['lead_id' => $lead->id]) }}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-plus-circle me-1"></i> Create New Booking
+                    </a>
+                </div>
+
+                @if($lead->bookings->count() > 0)
+                    <div class="table-responsive border rounded-2">
+                        <table class="table table-hover align-middle mb-0" style="font-size: 0.8125rem;">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Booking Ref</th>
+                                    <th>Project & Unit</th>
+                                    <th>Agreement Value</th>
+                                    <th>Collected</th>
+                                    <th>Pending</th>
+                                    <th>Status</th>
+                                    <th class="text-end pe-3">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($lead->bookings as $b)
+                                    @php $bBadge = $b->status_badge; @endphp
+                                    <tr>
+                                        <td class="ps-3">
+                                            <a href="{{ route('bookings.show', $b->id) }}" class="fw-bold text-primary text-decoration-none">
+                                                {{ $b->booking_reference }}
+                                            </a>
+                                            <div class="text-muted" style="font-size: 0.7rem;">{{ $b->booking_date->format('d M Y') }}</div>
+                                        </td>
+                                        <td>
+                                            <div class="fw-semibold text-dark">{{ $b->project?->name ?? 'N/A' }}</div>
+                                            <div class="text-muted" style="font-size: 0.72rem;">
+                                                @if($b->unit)
+                                                    {{ $b->unit->tower }} - Unit {{ $b->unit->unit_number }} ({{ $b->unit->configuration }})
+                                                @else
+                                                    Unassigned Unit
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td class="fw-bold text-dark">₹{{ number_format($b->agreement_value) }}</td>
+                                        <td class="text-success fw-bold">₹{{ number_format($b->total_paid) }} ({{ $b->progress_percentage }}%)</td>
+                                        <td class="text-warning fw-semibold">₹{{ number_format($b->total_pending) }}</td>
+                                        <td>
+                                            <span class="badge {{ $bBadge['badge'] }} px-2 py-1" style="font-size: 0.72rem;">
+                                                {{ $bBadge['label'] }}
+                                            </span>
+                                        </td>
+                                        <td class="text-end pe-3">
+                                            <a href="{{ route('bookings.show', $b->id) }}" class="btn btn-sm btn-outline-primary py-1 px-2">
+                                                View Milestones <i class="bi bi-arrow-right ms-1"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="text-center py-5 border rounded-2 bg-light bg-opacity-50">
+                        <i class="bi bi-receipt-cutoff text-muted fs-1 mb-2 d-block"></i>
+                        <h6 class="fw-bold text-dark">No Property Bookings Recorded Yet</h6>
+                        <p class="text-muted small mb-3">Has the customer finalized a property? Convert this lead into a confirmed sale!</p>
+                        <a href="{{ route('bookings.create', ['lead_id' => $lead->id]) }}" class="btn btn-sm btn-primary">
+                            <i class="bi bi-cash-coin me-1"></i> Record Property Booking for {{ $lead->name }}
+                        </a>
+                    </div>
+                @endif
             </div>
 
             <!-- TAB 4: AUDIT TRAIL (System Events & Full Lifecycle History) -->

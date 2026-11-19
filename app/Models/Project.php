@@ -40,4 +40,9 @@ class Project extends Model
     {
         return $this->hasMany(ProjectUnit::class, 'project_id')->orderBy('floor', 'desc')->orderBy('unit_number', 'asc');
     }
+
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class, 'project_id')->latest('id');
+    }
 }
