@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\AgentCommission;
+use App\Models\Booking;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +16,9 @@ class CommissionWebController extends Controller
      */
     public function index(Request $request)
     {
+        // Auto-sync any leads marked Won that don't have bookings/commissions yet
+        Booking::syncAllWonLeads();
+
         $user = Auth::user();
         $query = AgentCommission::with(['booking.project', 'booking.unit', 'agent', 'approver']);
 

@@ -187,6 +187,11 @@ class Lead extends Model
         return $this->hasOne(Booking::class, 'lead_id')->latestOfMany();
     }
 
+    public function documents()
+    {
+        return $this->hasMany(CustomerDocument::class, 'lead_id')->latest('id');
+    }
+
     /**
      * Cross-Project Portfolio: Find other inquiries by the same buyer across different projects
      */

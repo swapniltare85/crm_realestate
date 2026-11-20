@@ -229,7 +229,7 @@ class DatabaseSeeder extends Seeder
                 'lead_id' => $lead->id,
                 'user_id' => $admin->id,
                 'activity_type' => 'created',
-                'description' => "Lead added from source: {$lead->source->name}",
+                'description' => "Lead added from source: " . ($lead->leadSource?->name ?? 'Direct'),
             ]);
 
             // Add a follow-up for contacted leads

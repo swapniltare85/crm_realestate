@@ -23,6 +23,9 @@ class BookingWebController extends Controller
      */
     public function index(Request $request)
     {
+        // Auto-sync any leads marked Won that don't have bookings yet
+        Booking::syncAllWonLeads();
+
         $user = Auth::user();
         $query = Booking::with(['project', 'unit', 'agent', 'lead', 'milestones']);
 
@@ -346,5 +349,29 @@ class BookingWebController extends Controller
         ]);
 
         return back()->with('success', "New custom payment milestone added successfully!");
+    }
+
+    /**
+     * Display formal printable Real Estate Allotment Letter.
+     */
+    public function allotmentLetter($id)
+    {
+        $booking = Booking::with(['project', 'unit', 'agent', 'lead', 'milestones'])->findOrFail($id);
+        return view('bookings.allotment_letter', compact('booking'));
+    }
+
+    /**
+     * Display formal printable Payment Receipt.
+     */
+    public function receipt($id, $milestoneId = null)
+    {
+        $booking = Booking::with(['project', 'unit', 'agent'])->findOrFail($id);
+        $milestone = $milestoneId ? PaymentMilestone::where('booking_id', $booking->id)->findOrFail($milestoneId) : null;
+        return view('bookings.receipt', compact('booking', 'milestone'));
+    }
+
+    public function paymentReceipt($id, $milestoneId = null)
+    {
+        return $this->receipt($id, $milestoneId);
     }
 }

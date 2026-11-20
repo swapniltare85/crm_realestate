@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\Booking;
 use App\Models\Lead;
 use App\Models\LeadActivity;
 use App\Models\LeadFollowup;
@@ -257,7 +258,9 @@ class LeadWebController extends Controller
             'followups.user',
             'siteVisits.project',
             'siteVisits.assignedAgent',
-            'activities.user'
+            'activities.user',
+            'documents.uploader',
+            'bookings.unit.project'
         ])->findOrFail($id);
 
         // RBAC: Check if current user has permission to view this lead
@@ -528,7 +531,13 @@ class LeadWebController extends Controller
 
         $oldStatusName = $lead->status?->name ?? 'None';
         $lead->update(['status_id' => $request->status_id]);
-        $newStatusName = $lead->fresh()->status?->name ?? 'Unknown';
+        $freshLead = $lead->fresh();
+        $newStatusName = $freshLead->status?->name ?? 'Unknown';
+
+        // Auto-generate Booking and Agent Commission if marked Won
+        if ($freshLead->status?->slug === 'won') {
+            Booking::createForWonLead($freshLead);
+        }
 
         $roleDisplay = ucwords(str_replace('_', ' ', $user->role));
 
@@ -678,6 +687,10 @@ class LeadWebController extends Controller
                         ],
                     ],
                 ]);
+                if ($newStatus->slug === 'won') {
+                    Booking::createForWonLead($lead);
+                }
+
                 $count++;
             }
         }
@@ -731,6 +744,10 @@ class LeadWebController extends Controller
                         ],
                     ],
                 ]);
+                if ($newStatus->slug === 'won') {
+                    Booking::createForWonLead($lead);
+                }
+
                 $count++;
             }
         }

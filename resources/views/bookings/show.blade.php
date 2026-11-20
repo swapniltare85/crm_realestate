@@ -30,20 +30,35 @@
             </div>
         </div>
 
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <!-- Allotment Letter Button -->
+            <a href="{{ route('bookings.allotment-letter', $booking->id) }}" class="btn btn-sm btn-outline-primary" target="_blank" title="View & Print Official Allotment Letter">
+                <i class="bi bi-file-earmark-text me-1"></i> Allotment Letter
+            </a>
+
+            <!-- Token Money Receipt Button -->
+            <a href="{{ route('bookings.receipt', $booking->id) }}" class="btn btn-sm btn-outline-success" target="_blank" title="View & Print Official Payment Receipt">
+                <i class="bi bi-receipt me-1"></i> Token Receipt
+            </a>
+
+            <!-- Upload KYC Document Modal Button -->
+            <button type="button" class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#uploadDocModal" title="Upload Customer Aadhaar, PAN, or Cheque Slip">
+                <i class="bi bi-upload me-1"></i> Upload KYC
+            </button>
+
             <!-- Update Status Modal Button -->
             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#updateStatusModal">
                 <i class="bi bi-pencil-square me-1"></i> Update Status
             </button>
 
             <!-- Add Milestone Modal Button -->
-            <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addMilestoneModal">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#addMilestoneModal">
                 <i class="bi bi-plus-lg me-1"></i> Add Custom Stage
             </button>
 
             <!-- Print / Receipt Button -->
             <button type="button" class="btn btn-sm btn-primary" onclick="window.print()">
-                <i class="bi bi-printer me-1"></i> Print Booking Slip
+                <i class="bi bi-printer me-1"></i> Print
             </button>
         </div>
     </div>
@@ -417,8 +432,168 @@
                 </tbody>
             </table>
         </div>
+    <!-- Customer KYC & Compliance Documents Vault -->
+    <div class="card border mb-4">
+        <div class="card-header bg-white py-3 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <h6 class="fw-bold mb-0 text-dark">
+                    <i class="bi bi-folder-check text-primary me-2"></i>Customer KYC & Compliance Documents ({{ $booking->documents->count() }})
+                </h6>
+                <div class="text-muted small" style="font-size: 0.72rem;">Buyer Aadhaar, PAN card, token payment receipts, and RERA registration compliance proofs.</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#uploadDocModal">
+                <i class="bi bi-upload me-1"></i> Upload Document
+            </button>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th class="ps-3">Document Title & Type</th>
+                        <th>File Name & Size</th>
+                        <th>Uploaded By</th>
+                        <th>Verification Status</th>
+                        <th class="text-end pe-3">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($booking->documents as $doc)
+                        @php $vBadge = $doc->verification_badge; @endphp
+                        <tr>
+                            <td class="ps-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi {{ $doc->icon }} fs-4"></i>
+                                    <div>
+                                        <div class="fw-semibold text-dark">{{ $doc->document_title }}</div>
+                                        <div class="text-muted small" style="font-size: 0.7rem;">{{ $doc->document_type_label }}</div>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td>
+                                <div class="text-dark small font-monospace text-truncate" style="max-width: 200px;">{{ $doc->file_name }}</div>
+                                <div class="text-muted" style="font-size: 0.68rem;">{{ $doc->file_size_formatted }} • {{ strtoupper($doc->file_extension) }}</div>
+                            </td>
+
+                            <td>
+                                <div class="small fw-medium text-dark">{{ $doc->uploader?->name ?? 'System' }}</div>
+                                <div class="text-muted" style="font-size: 0.68rem;">{{ $doc->created_at->format('d M Y, h:i A') }}</div>
+                            </td>
+
+                            <td>
+                                <span class="badge {{ $vBadge['badge'] }} px-2 py-1" style="font-size: 0.72rem;">
+                                    <i class="bi {{ $vBadge['icon'] }} me-1"></i>{{ $vBadge['label'] }}
+                                </span>
+                                @if($doc->verifier)
+                                    <div class="text-muted" style="font-size: 0.65rem;">By {{ $doc->verifier->name }}</div>
+                                @endif
+                            </td>
+
+                            <td class="text-end pe-3">
+                                <div class="d-flex align-items-center justify-content-end gap-1">
+                                    <a href="{{ route('documents.download', $doc->id) }}" class="btn btn-sm btn-outline-primary py-1 px-2" title="Download Document">
+                                        <i class="bi bi-download"></i>
+                                    </a>
+
+                                    @if((Auth::user()->isAdmin() || Auth::user()->isManager()) && $doc->verification_status === 'pending')
+                                        <form method="POST" action="{{ route('documents.verify', $doc->id) }}" class="d-inline">
+                                            @csrf
+                                            <input type="hidden" name="verification_status" value="verified">
+                                            <button type="submit" class="btn btn-sm btn-outline-success py-1 px-2" title="Mark as Verified">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                        </form>
+
+                                        <form method="POST" action="{{ route('documents.verify', $doc->id) }}" class="d-inline">
+                                            @csrf
+                                            <input type="hidden" name="verification_status" value="rejected">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger py-1 px-2" title="Reject Document">
+                                                <i class="bi bi-x-lg"></i>
+                                            </button>
+                                        </form>
+                                    @endif
+
+                                    @if(Auth::user()->isAdmin() || (int)$doc->uploaded_by === (int)Auth::id())
+                                        <form method="POST" action="{{ route('documents.destroy', $doc->id) }}" class="d-inline" onsubmit="return confirm('Delete this document?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-secondary py-1 px-2 text-danger" title="Delete">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                <i class="bi bi-folder-x text-muted fs-3 d-block mb-1"></i>
+                                <span class="small">No KYC documents uploaded yet. Click "Upload Document" to attach Aadhaar, PAN or Cheque proof.</span>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
     </div>
 
+</div>
+
+<!-- Modal: Upload KYC Document -->
+<div class="modal fade" id="uploadDocModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header py-2 px-3 bg-light">
+                <h6 class="modal-title fw-bold mb-0"><i class="bi bi-upload text-primary me-2"></i>Upload Customer KYC Document</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ route('documents.store') }}" enctype="multipart/form-data">
+                @csrf
+                <input type="hidden" name="booking_id" value="{{ $booking->id }}">
+                @if($booking->lead_id)
+                    <input type="hidden" name="lead_id" value="{{ $booking->lead_id }}">
+                @endif
+                <div class="modal-body p-3">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary mb-1">Document Classification <span class="text-danger">*</span></label>
+                        <select name="document_type" class="form-select form-select-sm" required>
+                            <option value="aadhaar_card">Aadhaar Card (Identity / Address Proof)</option>
+                            <option value="pan_card">PAN Card (Income Tax Mandatory)</option>
+                            <option value="token_cheque">Token Cheque Copy / Bank Transaction Slip</option>
+                            <option value="allotment_letter">Signed Allotment Letter</option>
+                            <option value="sale_agreement">Agreement for Sale</option>
+                            <option value="passport">Passport / NRI Verification</option>
+                            <option value="salary_slip">Salary Slips / Bank Statement (Home Loan)</option>
+                            <option value="other">Other Official Document</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary mb-1">Document Title <span class="text-danger">*</span></label>
+                        <input type="text" name="document_title" class="form-control form-control-sm" required placeholder="e.g. Buyer Aadhaar Card Front & Back">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold text-secondary mb-1">Select File (PDF, JPG, PNG, DOCX - Max 10MB) <span class="text-danger">*</span></label>
+                        <input type="file" name="document_file" class="form-control form-control-sm" required accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx">
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label small fw-semibold text-secondary mb-1">Compliance Notes / Remarks</label>
+                        <textarea name="notes" class="form-control form-control-sm" rows="2" placeholder="Optional notes for verifier"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer py-2 px-3 bg-light">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary fw-semibold">
+                        <i class="bi bi-upload me-1"></i> Upload File
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <!-- Modal: Update Lifecycle Status -->

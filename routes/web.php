@@ -3,6 +3,7 @@
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\BookingWebController;
 use App\Http\Controllers\Web\CommissionWebController;
+use App\Http\Controllers\Web\CustomerDocumentWebController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\LeadImportExportController;
 use App\Http\Controllers\Web\LeadWebController;
@@ -55,9 +56,19 @@ Route::middleware('auth')->group(function () {
         Route::get('/create', [BookingWebController::class, 'create'])->name('create');
         Route::post('/', [BookingWebController::class, 'store'])->name('store');
         Route::get('/{id}', [BookingWebController::class, 'show'])->name('show');
+        Route::get('/{id}/allotment-letter', [BookingWebController::class, 'allotmentLetter'])->name('allotment-letter');
+        Route::get('/{id}/receipt/{milestoneId?}', [BookingWebController::class, 'receipt'])->name('receipt');
         Route::post('/{id}/status', [BookingWebController::class, 'updateStatus'])->name('update-status');
         Route::post('/{id}/milestones/{milestoneId}/pay', [BookingWebController::class, 'recordMilestonePayment'])->name('milestones.pay');
         Route::post('/{id}/milestones', [BookingWebController::class, 'addCustomMilestone'])->name('milestones.store');
+    });
+
+    // Customer KYC & Booking Documents Vault
+    Route::prefix('documents')->name('documents.')->group(function () {
+        Route::post('/', [CustomerDocumentWebController::class, 'store'])->name('store');
+        Route::get('/{id}/download', [CustomerDocumentWebController::class, 'download'])->name('download');
+        Route::post('/{id}/verify', [CustomerDocumentWebController::class, 'verify'])->name('verify');
+        Route::delete('/{id}', [CustomerDocumentWebController::class, 'destroy'])->name('destroy');
     });
 
     // Agent Commission & Incentive Tracker Module

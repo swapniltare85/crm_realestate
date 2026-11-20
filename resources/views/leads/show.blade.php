@@ -227,6 +227,11 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link fw-semibold small py-3 px-3 border-0 rounded-0" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documentsTabPane" type="button" role="tab">
+                    <i class="bi bi-folder-check me-1 text-primary"></i> KYC & Documents ({{ $lead->documents->count() }})
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link fw-semibold small py-3 px-3 border-0 rounded-0" id="audit-tab" data-bs-toggle="tab" data-bs-target="#auditTabPane" type="button" role="tab">
                     <i class="bi bi-clock-history me-1 text-primary"></i> Audit Trail ({{ $auditTrail->count() }})
                 </button>
@@ -858,6 +863,137 @@
                 @endif
             </div>
 
+            <!-- TAB: KYC & COMPLIANCE DOCUMENTS VAULT -->
+            <div class="tab-pane fade" id="documentsTabPane" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-wrap gap-2">
+                    <div>
+                        <h6 class="fw-bold text-dark mb-1">
+                            <i class="bi bi-folder-check text-primary me-1"></i> Customer KYC & Compliance Documents Vault
+                        </h6>
+                        <p class="text-muted small mb-0">Upload Aadhaar, PAN card, token payment slips, allotment letters, and booking agreements.</p>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#uploadLeadDocModal">
+                        <i class="bi bi-cloud-arrow-up me-1"></i> Upload KYC Document
+                    </button>
+                </div>
+
+                @if($lead->documents->count() > 0)
+                    <div class="table-responsive border rounded-2 bg-white">
+                        <table class="table table-hover align-middle mb-0 small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Document</th>
+                                    <th>Type</th>
+                                    <th>File Size</th>
+                                    <th>Uploaded By</th>
+                                    <th>Status</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($lead->documents as $doc)
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <i class="bi {{ $doc->icon }} fs-4 text-primary"></i>
+                                                <div>
+                                                    <span class="fw-semibold text-dark d-block">{{ $doc->title }}</span>
+                                                    <span class="text-muted" style="font-size: 0.75rem;">
+                                                        Added {{ $doc->created_at->format('d M Y, h:i A') }}
+                                                        @if($doc->document_number) &bull; No: <code>{{ $doc->document_number }}</code> @endif
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border">{{ $doc->document_type_label }}</span>
+                                        </td>
+                                        <td class="text-muted">{{ $doc->file_size_formatted }}</td>
+                                        <td>
+                                            <span class="small text-muted">{{ $doc->uploader?->name ?? 'System' }}</span>
+                                        </td>
+                                        <td>
+                                            {!! $doc->verification_badge_html !!}
+                                            @if($doc->rejection_reason && $doc->verification_status === 'rejected')
+                                                <span class="d-block text-danger mt-1" style="font-size: 0.72rem;">Reason: {{ $doc->rejection_reason }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-end">
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{{ route('documents.download', $doc->id) }}" class="btn btn-outline-secondary py-1" title="Download Document">
+                                                    <i class="bi bi-download"></i>
+                                                </a>
+
+                                                @if(auth()->user()->role === 'admin' || auth()->user()->role === 'manager')
+                                                    @if($doc->verification_status !== 'verified')
+                                                        <form action="{{ route('documents.verify', $doc->id) }}" method="POST" class="d-inline">
+                                                            @csrf
+                                                            <input type="hidden" name="verification_status" value="verified">
+                                                            <button type="submit" class="btn btn-outline-success py-1" title="Approve & Verify">
+                                                                <i class="bi bi-check-lg"></i>
+                                                            </button>
+                                                        </form>
+                                                    @endif
+
+                                                    @if($doc->verification_status !== 'rejected')
+                                                        <button type="button" class="btn btn-outline-warning py-1" data-bs-toggle="modal" data-bs-target="#rejectLeadDocModal{{ $doc->id }}" title="Reject Document">
+                                                            <i class="bi bi-x-lg"></i>
+                                                        </button>
+                                                    @endif
+                                                @endif
+
+                                                <form action="{{ route('documents.destroy', $doc->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this KYC document?');">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="btn btn-outline-danger py-1" title="Delete">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+
+                                            @if(auth()->user()->role === 'admin' || auth()->user()->role === 'manager')
+                                                <!-- Reject Modal for Document -->
+                                                <div class="modal fade" id="rejectLeadDocModal{{ $doc->id }}" tabindex="-1">
+                                                    <div class="modal-dialog modal-dialog-centered modal-sm text-start">
+                                                        <div class="modal-content">
+                                                            <form action="{{ route('documents.verify', $doc->id) }}" method="POST">
+                                                                @csrf
+                                                                <input type="hidden" name="verification_status" value="rejected">
+                                                                <div class="modal-header py-2">
+                                                                    <h6 class="modal-title fw-bold text-danger">Reject Document</h6>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                                </div>
+                                                                <div class="modal-body py-2">
+                                                                    <label class="form-label small fw-semibold">Rejection Reason</label>
+                                                                    <textarea name="rejection_reason" class="form-control form-control-sm" rows="3" placeholder="e.g. Blurred photo, expired ID, name mismatch..." required></textarea>
+                                                                </div>
+                                                                <div class="modal-footer py-2">
+                                                                    <button type="button" class="btn btn-xs btn-light" data-bs-dismiss="modal">Cancel</button>
+                                                                    <button type="submit" class="btn btn-xs btn-danger">Confirm Reject</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="text-center py-5 border rounded-2 bg-light bg-opacity-50">
+                        <i class="bi bi-folder-x text-muted fs-1 mb-2 d-block"></i>
+                        <h6 class="fw-bold text-dark">No KYC or Compliance Documents Uploaded</h6>
+                        <p class="text-muted small mb-3">Upload Aadhaar card, PAN card, token payment receipt, or allotment agreement.</p>
+                        <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#uploadLeadDocModal">
+                            <i class="bi bi-cloud-arrow-up me-1"></i> Upload First Document
+                        </button>
+                    </div>
+                @endif
+            </div>
+
             <!-- TAB 4: AUDIT TRAIL (System Events & Full Lifecycle History) -->
             <div class="tab-pane fade" id="auditTabPane" role="tabpanel">
                 <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom flex-wrap gap-2">
@@ -1075,6 +1211,71 @@
                 @endforelse
             </div>
 
+        </div>
+    </div>
+</div>
+
+<!-- Upload KYC Document Modal for Lead -->
+<div class="modal fade" id="uploadLeadDocModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form action="{{ route('documents.store') }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                <input type="hidden" name="lead_id" value="{{ $lead->id }}">
+                @if($lead->bookings->first())
+                    <input type="hidden" name="booking_id" value="{{ $lead->bookings->first()->id }}">
+                @endif
+                <div class="modal-header border-bottom py-3">
+                    <h6 class="modal-title fw-bold text-dark">
+                        <i class="bi bi-cloud-arrow-up text-primary me-2"></i>Upload KYC & Booking Document
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Document Type <span class="text-danger">*</span></label>
+                        <select name="document_type" class="form-select form-select-sm" required>
+                            <option value="">-- Select Type --</option>
+                            <option value="aadhaar_card">Aadhaar Card (UIDAI)</option>
+                            <option value="pan_card">PAN Card (Income Tax)</option>
+                            <option value="passport">Passport</option>
+                            <option value="token_cheque">Token Payment Slip / Cheque Copy</option>
+                            <option value="allotment_letter">Allotment Letter</option>
+                            <option value="booking_form">Signed Booking Application</option>
+                            <option value="agreement_for_sale">Agreement for Sale</option>
+                            <option value="cost_sheet">Stamped Cost Sheet</option>
+                            <option value="bank_loan_sanction">Bank Loan Sanction Letter</option>
+                            <option value="other">Other Supporting Document</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Document Title / Label <span class="text-danger">*</span></label>
+                        <input type="text" name="title" class="form-control form-control-sm" placeholder="e.g. Customer PAN Card Front & Back" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Document / ID Number (Optional)</label>
+                        <input type="text" name="document_number" class="form-control form-control-sm" placeholder="e.g. ABCDE1234F or XXXX-XXXX-1234">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Select File (PDF, PNG, JPG, JPEG, max 10MB) <span class="text-danger">*</span></label>
+                        <input type="file" name="file" class="form-control form-control-sm" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" required>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label small fw-semibold">Remarks / Notes (Optional)</label>
+                        <textarea name="remarks" class="form-control form-control-sm" rows="2" placeholder="Any special notes or verification remarks..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-top py-2 px-4">
+                    <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-upload me-1"></i> Upload & Save Document
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
